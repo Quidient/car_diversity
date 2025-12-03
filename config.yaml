@@ -1,0 +1,67 @@
+# Configuration for car diversity selection pipeline
+
+# Input/Output
+input:
+  image_dir: "./images"  # Directory containing raw car images
+
+output:
+  output_dir: "./output"  # Directory for results
+  copy_images: false  # Copy selected images to output directory
+  create_symlinks: true  # Create symlinks instead of copying (faster)
+
+# Hardware
+hardware:
+  device: "cuda"  # 'cuda' or 'cpu'
+  vram_limit_gb: 32  # VRAM limit (RTX 5090 has 32GB)
+  batch_size: 128  # Batch size for processing
+  use_fp16: true  # Use FP16 for faster processing
+
+# Quality Filtering
+quality_filter:
+  enabled: true  # Enable quality filtering
+  min_resolution: 256  # Minimum image dimension
+  max_aspect_ratio: 3.0  # Maximum width/height ratio
+  brisque_threshold: 45.0  # BRISQUE quality threshold (lower is better)
+  blur_threshold: 100.0  # Laplacian variance threshold (higher is better)
+  car_confidence_threshold: 0.0  # CLIP confidence for car detection (0 is off)
+
+# Feature Extraction
+feature_extraction:
+  model_name: "dinov2-large"  # Options: dinov2-small, dinov2-base, dinov2-large, dinov2-giant
+  multilayer: true  # Extract from multiple layers
+  layers: [4, 8, 12]  # Layers to extract from (if multilayer=true)
+  use_clip: false  # Also extract CLIP features
+
+# Dimensionality Reduction
+dimensionality_reduction:
+  enabled: true  # Enable PCA reduction
+  n_components: 512  # Number of PCA components
+
+# Deduplication
+deduplication:
+  enabled: true  # Enable near-duplicate removal
+  threshold: 0.95  # Cosine similarity threshold
+
+# Diversity Selection
+diversity_selection:
+  n_select: 30000  # Number of images to select
+  method: "hybrid"  # Options: random, kmeans, fps, hybrid
+
+  # Hybrid method parameters
+  hybrid:
+    n_clusters: 3000  # Number of clusters for hierarchical selection
+
+  # FPS parameters
+  fps:
+    batch_size: 10000  # Batch size for distance computation
+
+# Evaluation
+evaluation:
+  enabled: true  # Enable evaluation metrics
+  create_visualization: true  # Create t-SNE visualization
+  visualization_method: "tsne"  # Options: tsne, umap, pca
+
+# Logging
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  log_file: null  # Log file path (null for console only)
