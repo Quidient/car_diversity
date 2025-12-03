@@ -115,7 +115,7 @@ python3.10 -m venv venv
 source venv/bin/activate
 
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-pip install numpy pillow tqdm scikit-learn opencv-python pyyaml pandas matplotlib seaborn
+pip install numpy pillow tqdm scikit-learn opencv-python pyyaml pandas matplotlib scipy
 pip install faiss-gpu transformers accelerate pyiqa ftfy timm
 pip install cuml-cu12 cudf-cu12
 
@@ -140,7 +140,7 @@ python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 
 ### 3. Run Your First Selection
 
-**Option A: Quick Test (5-10 minutes)**
+**Option A: Quick Test**
 
 ```bash
 ./run.sh quick test_images
@@ -161,7 +161,7 @@ ls -lh output/
 # - selected_images.txt           (list of selected paths)
 # - selected_images_symlinks/     (symlinks to images)
 # - evaluation_metrics.yaml       (quality metrics)
-# - selection_visualization.png   (t-SNE plot)
+# - visualizations/               (comprehensive visual analysis)
 ```
 
 ---
@@ -178,14 +178,14 @@ Removes low-quality images via:
 - Aspect ratio filter
 - BRISQUE quality assessment
 - Blur detection (Laplacian variance)
-- CLIP-based car content validation ** Not working currently
+- CLIP-based car content validation (currently disabled in code)
 
 ### Stage 2: Feature Extraction
 
-**Input:** N clean images  
-**Output:** N × 1024 embeddings
+**Input:** N clean images
+**Output:** N × D embeddings (D depends on model: 1024 for dinov2-large)
 
-**DINOv2 ViT-L/14** is the optimal choice for diversity-based selection. Unlike supervised models biased toward classification-relevant features, DINOv2's self-supervised training produces embeddings that capture both low-level visual properties and high-level semantic structure. Its **KoLeo regularizer** specifically encourages uniform, well-distributed feature representations—directly beneficial for diversity sampling.
+**DINOv2 ViT-L** is the optimal choice for diversity-based selection. Unlike supervised models biased toward classification-relevant features, DINOv2's self-supervised training produces embeddings that capture both low-level visual properties and high-level semantic structure. Its **KoLeo regularizer** specifically encourages uniform, well-distributed feature representations—directly beneficial for diversity sampling.
 
 **Multi-layer Feature Fusion (Optional):**
 
@@ -198,8 +198,8 @@ Enable with `multilayer: true` in config to concatenate features from multiple l
 
 ### Stage 3: Dimensionality Reduction
 
-**Input:** N × 1024 embeddings  
-**Output:** N × 512 embeddings
+**Input:** N × D embeddings
+**Output:** N × 512 embeddings (configurable)
 
 PCA reduction for faster downstream processing.
 
@@ -219,19 +219,15 @@ FAISS-based near-duplicate removal:
 
 **Mathematical Foundations:**
 
-The selection optimizes two complementary objectives:
-- **Facility Location** (coverage): Measures how well the selected subset represents the full dataset. Greedy maximization achieves (1 - 1/e) ≈ 0.632 approximation guarantee.
-- **k-Center** (minimax radius): Minimizes the maximum distance from any point to its nearest selected representative. Greedy farthest-point sampling achieves 2-approximation guarantee.
+The selection optimizes coverage using **k-Center** approach: Minimizes the maximum distance from any point to its nearest selected representative. Greedy farthest-point sampling achieves 2-approximation guarantee.
 
 **Algorithm Comparison:**
 
-| Algorithm                | Time Complexity | GPU Support | Guarantee      |
-| ------------------------ | --------------- | ----------- | -------------- |
-| Random sampling          | O(k)            | N/A         | None           |
-| K-means + medoids        | O(n·k·d·iter)   | ✅ cuML      | None           |
-| Farthest Point Sampling  | O(n·k)          | ✅ FAISS     | 2-approx       |
-| Facility Location Greedy | O(n·k)          | ✅ SubModLib | (1-1/e)-approx |
-| Exact DPP                | O(n³)           | ❌           | Optimal        |
+| Algorithm               | Time Complexity | GPU Support | Guarantee |
+| ----------------------- | --------------- | ----------- | --------- |
+| Random sampling         | O(k)            | N/A         | None      |
+| K-means + medoids       | O(n·k·d·iter)   | ✅ cuML      | None      |
+| Farthest Point Sampling | O(n·k)          | ✅ FAISS     | 2-approx  |
 
 **Selection Methods:**
 
@@ -391,9 +387,39 @@ output/
 ├── embeddings_reduced.npy           # PCA-reduced embeddings
 ├── pca_model.pkl                    # Trained PCA model
 ├── evaluation_metrics.yaml          # Diversity metrics
-├── selection_visualization.png      # t-SNE plot
 ├── selected_images_symlinks/        # Symlinks to selected images
-└── selected_images/                 # Copied images (if enabled)
+├── selected_images/                 # Copied images (if enabled)
+└── visualizations/                  # Comprehensive visualizations
+    ├── selection_scatter.png        # t-SNE scatter plot
+    ├── coverage_distribution.png    # Coverage analysis
+    ├── diversity_matrix.png         # Pairwise distance heatmap
+    └── metrics_dashboard.png        # Comprehensive metrics dashboard
+```
+
+### Visualization Details
+
+The pipeline generates four comprehensive visualizations:
+
+1. **Selection Scatter Plot** (`selection_scatter.png`)
+   - t-SNE/UMAP projection showing selected vs non-selected points
+   - Helps visualize spatial distribution and coverage
+
+2. **Coverage Distribution** (`coverage_distribution.png`)
+   - Histogram of distances to nearest selected point
+   - Cumulative distribution function
+   - Box plot of coverage statistics
+   - Summary statistics table
+
+3. **Diversity Matrix** (`diversity_matrix.png`)
+   - Pairwise distance heatmap within selected subset
+   - Distribution of intra-selection distances
+   - Shows how diverse the selected images are from each other
+
+4. **Metrics Dashboard** (`metrics_dashboard.png`)
+   - Comprehensive overview of all selection metrics
+   - Coverage and diversity quality scores
+   - Performance comparison charts
+   - Automated recommendations for improvement
 ```
 
 ---
@@ -418,13 +444,12 @@ Good selection should have:
 
 ### Expected Performance by Method
 
-| Method                   | Coverage Radius | Guarantee      |
-| ------------------------ | --------------- | -------------- |
-| Random                   | Baseline        | None           |
-| K-means                  | ~1.5x worse     | None           |
-| Pure FPS                 | Best            | 2-approx       |
-| Facility Location        | ~1.2x worse     | (1-1/e)-approx |
-| **Hybrid (recommended)** | Near-best       | Combined       |
+| Method                   | Coverage Radius | Guarantee |
+| ------------------------ | --------------- | --------- |
+| Random                   | Baseline        | None      |
+| K-means                  | Good            | None      |
+| Pure FPS                 | Best            | 2-approx  |
+| **Hybrid (recommended)** | Near-best       | Combined  |
 
 ---
 

@@ -2,12 +2,19 @@
 """Example usage of the car diversity selection pipeline."""
 
 import logging
-from pathlib import Path
 from src.pipeline import DiverseCarImageSelector
-from src.feature_extractor import FeatureExtractor, CLIPFeatureExtractor, combine_features
+from src.feature_extractor import (
+    FeatureExtractor,
+    CLIPFeatureExtractor,
+    combine_features,
+)
 from src.diversity_selector import DiversitySelector
-from src.evaluation import evaluate_selection, compare_selection_methods, visualize_selection
-from src.utils import save_results, load_results, create_symlinks
+from src.evaluation import (
+    evaluate_selection,
+    compare_selection_methods,
+    visualize_selection,
+)
+from src.utils import save_results
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,14 +28,14 @@ def example_1_basic_pipeline():
         vram_limit_gb=32,
         batch_size=128,  # RTX 5090 can handle larger batches
         device="cuda",
-        use_fp16=True
+        use_fp16=True,
     )
 
     selected_images = selector.run_pipeline(
         image_dir="./images",
         n_select=30000,
         output_dir="./output/example1",
-        selection_method="hybrid"
+        selection_method="hybrid",
     )
 
     logger.info(f"Selected {len(selected_images)} images")
@@ -42,9 +49,7 @@ def example_2_custom_feature_extraction():
 
     # Extract DINOv2 features
     dinov2_extractor = FeatureExtractor(
-        model_name='dinov2-large',
-        multilayer=True,
-        layers=[4, 8, 12]
+        model_name="dinov2-large", multilayer=True, layers=[4, 8, 12]
     )
     dinov2_features = dinov2_extractor.extract_features(image_paths)
 
@@ -53,7 +58,9 @@ def example_2_custom_feature_extraction():
     clip_features = clip_extractor.extract_features(image_paths)
 
     # Combine features
-    combined_features = combine_features(dinov2_features, clip_features, pca_components=1024)
+    combined_features = combine_features(
+        dinov2_features, clip_features, pca_components=1024
+    )
 
     logger.info(f"Combined features shape: {combined_features.shape}")
 
@@ -64,27 +71,30 @@ def example_3_compare_methods():
 
     # Assume we have embeddings from feature extraction
     import numpy as np
+
     embeddings = np.load("./output/embeddings_reduced.npy")
 
     selector = DiversitySelector(device="cuda")
 
     # Test different methods
     selections = {
-        'random': selector.select_diverse(embeddings, 5000, method='random'),
-        'kmeans': selector.select_diverse(embeddings, 5000, method='kmeans'),
-        'fps': selector.select_diverse(embeddings, 5000, method='fps'),
-        'hybrid': selector.select_diverse(embeddings, 5000, method='hybrid'),
+        "random": selector.select_diverse(embeddings, 5000, method="random"),
+        "kmeans": selector.select_diverse(embeddings, 5000, method="kmeans"),
+        "fps": selector.select_diverse(embeddings, 5000, method="fps"),
+        "hybrid": selector.select_diverse(embeddings, 5000, method="hybrid"),
     }
 
     # Compare
     results = compare_selection_methods(embeddings, selections)
 
     # Save comparison
-    save_results(results, "./output/method_comparison.yaml", mode='yaml')
+    save_results(results, "./output/method_comparison.yaml", mode="yaml")
 
 
 def example_4_incremental_selection():
     """Example 4: Incremental selection (select more from existing pool)."""
+    import numpy as np
+
     logger.info("Example 4: Incremental Selection")
 
     # Load previous results
@@ -94,15 +104,15 @@ def example_4_incremental_selection():
     # Select additional diverse images
     selector = DiversitySelector(device="cuda")
 
-    # Create a mask for unselected images
-    import numpy as np
     all_indices = np.arange(len(embeddings))
     unselected_mask = ~np.isin(all_indices, initial_selection)
     unselected_embeddings = embeddings[unselected_mask]
     unselected_indices = all_indices[unselected_mask]
 
     # Select 5000 more diverse images from remaining pool
-    additional_local = selector.select_diverse(unselected_embeddings, 5000, method='fps')
+    additional_local = selector.select_diverse(
+        unselected_embeddings, 5000, method="fps"
+    )
     additional_global = unselected_indices[additional_local]
 
     # Combine with initial selection
@@ -123,13 +133,13 @@ def example_5_quality_filter_only():
         max_aspect_ratio=3.0,
         brisque_threshold=45.0,
         blur_threshold=100.0,
-        car_confidence_threshold=0.6
+        car_confidence_threshold=0.6,
     )
 
     valid_images = qf.filter_dataset("./images")
 
     logger.info(f"Filtered to {len(valid_images)} valid images")
-    save_results(valid_images, "./output/quality_filtered.txt", mode='list')
+    save_results(valid_images, "./output/quality_filtered.txt", mode="list")
 
 
 def example_6_evaluation_and_visualization():
@@ -150,12 +160,12 @@ def example_6_evaluation_and_visualization():
     logger.info(f"  Intra-diversity: {metrics['intra_diversity_mean']:.4f}")
 
     # Create visualizations with different methods
-    for method in ['pca', 'tsne']:
+    for method in ["pca", "tsne"]:
         visualize_selection(
             embeddings,
             selected_indices,
             f"./output/visualization_{method}.png",
-            method=method
+            method=method,
         )
 
 
@@ -169,11 +179,7 @@ def example_7_batch_processing():
         ("./images/dataset3", "./output/dataset3", 15000),
     ]
 
-    selector = DiverseCarImageSelector(
-        vram_limit_gb=32,
-        batch_size=128,
-        device="cuda"
-    )
+    selector = DiverseCarImageSelector(vram_limit_gb=32, batch_size=128, device="cuda")
 
     for image_dir, output_dir, n_select in datasets:
         logger.info(f"Processing {image_dir}...")
@@ -182,7 +188,7 @@ def example_7_batch_processing():
             image_dir=image_dir,
             n_select=n_select,
             output_dir=output_dir,
-            selection_method="hybrid"
+            selection_method="hybrid",
         )
 
         logger.info(f"Completed {image_dir}: {len(selected_images)} images selected")
@@ -193,11 +199,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run example scripts")
     parser.add_argument(
-        '--example',
+        "--example",
         type=int,
         choices=range(1, 8),
         required=True,
-        help='Example number to run (1-7)'
+        help="Example number to run (1-7)",
     )
 
     args = parser.parse_args()
