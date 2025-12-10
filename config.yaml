@@ -23,7 +23,7 @@ quality_filter:
   max_aspect_ratio: 3.0  # Maximum width/height ratio
   brisque_threshold: 45.0  # BRISQUE quality threshold (lower is better)
   blur_threshold: 100.0  # Laplacian variance threshold (higher is better)
-  car_confidence_threshold: 0.0  # CLIP confidence for car detection (0 is off)
+  car_confidence_threshold: 0.50  # CLIP confidence for car detection (0 is off)
 
 # Feature Extraction
 feature_extraction:
@@ -44,8 +44,8 @@ deduplication:
 
 # Diversity Selection
 diversity_selection:
-  n_select: 30000  # Number of images to select
-  method: "hybrid"  # Options: random, kmeans, fps, hybrid
+  n_select: 10000  # Number of images to select
+  method: "fps"  # Options: random, kmeans, fps, hybrid, spectral
 
   # Hybrid method parameters
   hybrid:

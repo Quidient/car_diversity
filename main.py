@@ -134,7 +134,7 @@ Examples:
     parser.add_argument(
         "--method",
         type=str,
-        choices=["random", "kmeans", "fps", "hybrid"],
+        choices=["random", "kmeans", "fps", "hybrid", "spectral"],
         help="Selection method (overrides config)",
     )
 

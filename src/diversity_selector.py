@@ -43,6 +43,8 @@ class DiversitySelector:
             return self._fps_selection(embeddings, n_select)
         elif method == "hybrid":
             return self._hybrid_selection(embeddings, n_select)
+        elif method == "spectral":
+            return self._spectral_selection(embeddings, n_select)
         else:
             raise ValueError(f"Unknown selection method: {method}")
 
@@ -125,7 +127,7 @@ class DiversitySelector:
         min_distances = np.full(n, np.inf, dtype=np.float32)
 
         # Batch size for distance computation
-        batch_size = 10000
+        batch_size = 30000
 
         for iteration in tqdm(range(1, n_select), desc="FPS selection"):
             # Update distances in batches
@@ -254,6 +256,40 @@ class DiversitySelector:
         logger.info(f"Final selection: {len(selected_indices)} images")
 
         return selected_indices
+    
+    def _spectral_selection(self, embeddings: np.ndarray, n_select: int) -> np.ndarray:
+        """
+        Spectral clustering + medoid selection.
+
+        Args:
+            embeddings: Feature embeddings
+            n_select: Number of clusters/images to select
+
+        Returns:
+            Indices of cluster medoids
+        """
+        logger.info(f"Running spectral_clustering with {n_select} clusters...")
+
+        # Fall back to sklearn
+        logger.info("cuML not available, using sklearn (CPU) for spectral_clustering")
+        from sklearn.cluster import SpectralClustering
+
+        clusterer = SpectralClustering(
+            n_clusters=n_select, verbose=0
+        )
+        clusterer.fit(embeddings)
+        cluster_centers = clusterer.cluster_centers_
+
+        # Find medoids (closest real image to each cluster center)
+        logger.info("Finding cluster medoids...")
+        medoid_indices = []
+
+        for center in tqdm(cluster_centers, desc="Finding medoids"):
+            distances = np.linalg.norm(embeddings - center, axis=1)
+            medoid_idx = np.argmin(distances)
+            medoid_indices.append(medoid_idx)
+
+        return np.array(medoid_indices)
 
     def _fast_fps_small(self, embeddings: np.ndarray, n_select: int) -> np.ndarray:
         """

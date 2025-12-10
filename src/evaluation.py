@@ -312,8 +312,8 @@ def visualize_selection(
     ax.scatter(
         reduced[mask, 0],
         reduced[mask, 1],
-        c="lightgray",
-        s=1,
+        c="red",
+        s=10,
         alpha=0.5,
         label="Not selected",
     )
@@ -322,7 +322,7 @@ def visualize_selection(
     ax.scatter(
         reduced[valid_plot_indices, 0],
         reduced[valid_plot_indices, 1],
-        c="red",
+        c="green",
         s=10,
         alpha=0.8,
         label="Selected",
@@ -675,7 +675,8 @@ def visualize_selection_metrics_dashboard(
             100 * (1 - (metrics.get("coverage_radius_mean", 1) / max_expected_dist)),
         ),
     )
-    diversity_score = max(0, min(100, metrics.get("intra_diversity_mean", 0) * 20))
+    max_diversity_dist = metrics.get("intra_diversity_max", 0)
+    diversity_score = max(0, min(100, (metrics.get("intra_diversity_mean", 0)/max_diversity_dist)*100))
     overall_score = (coverage_score + diversity_score) / 2
 
     quality_text = f"""

@@ -109,8 +109,13 @@ class DiverseCarImageSelector:
 
         # Phase 1: Quality Filtering
         if skip_quality_filter:
-            logger.info("Phase 1: Skipping quality filtering (loading all images)...")
-            valid_images = load_image_paths(image_dir)
+            logger.info("Phase 1: Skipping quality filtering...")
+            if Path(output_path / "filtered_images.txt").is_file():
+                logger.info("Filtered image list found, loading...")
+                valid_images = load_image_paths(image_dir, filter_list=str(output_path / "filtered_images.txt"))
+            else:
+                logger.info("Filtered image list not found, loading all images...")
+                valid_images = load_image_paths(image_dir)
         else:
             logger.info("Phase 1: Quality filtering...")
             self.quality_filter = QualityFilter(
@@ -144,6 +149,9 @@ class DiverseCarImageSelector:
 
         # Save raw embeddings
         np.save(output_path / "embeddings_raw.npy", embeddings)
+
+        # logger.info("Loading DINO embeddings...")
+        # embeddings = np.load(output_path / "embeddings_raw.npy")
 
         # Phase 3: Dimensionality Reduction
         logger.info("Phase 3: PCA dimensionality reduction...")

@@ -18,7 +18,7 @@ MIN_RESOLUTION_DEFAULT = 256
 MAX_ASPECT_RATIO_DEFAULT = 3.0
 BRISQUE_THRESHOLD_DEFAULT = 45.0
 BLUR_THRESHOLD_DEFAULT = 100.0
-CAR_CONFIDENCE_THRESHOLD_DEFAULT = 0.6
+CAR_CONFIDENCE_THRESHOLD_DEFAULT = 0.5
 QUALITY_FILTER_IMG_SIZE = (512, 512)
 
 
@@ -223,13 +223,13 @@ class QualityFilter:
         else:
             logger.warning("Skipping quality assessment (BRISQUE not available)")
 
-        # # Stage 3: Car content validation
-        # if self.clip_model:
-        #     logger.info("Stage 3: Car content validation (CLIP)...")
-        #     valid_paths = self._car_content_filter(valid_paths)
-        #     logger.info(f"Passed car content filter: {len(valid_paths):,}")
-        # else:
-        #     logger.warning("Skipping car content validation (CLIP not available)")
+        # Stage 3: Car content validation
+        if self.clip_model:
+            logger.info("Stage 3: Car content validation (CLIP)...")
+            valid_paths = self._car_content_filter(valid_paths)
+            logger.info(f"Passed car content filter: {len(valid_paths):,}")
+        else:
+            logger.warning("Skipping car content validation (CLIP not available)")
 
         return valid_paths
 
@@ -310,7 +310,7 @@ class QualityFilter:
         # More than that increases memory overhead and context switching cost.
         max_cap = 16
 
-        return min(workers, max_cap)
+        min(workers, max_cap)
 
     def _quality_filter(self, image_paths: list[str]) -> list[str]:
         """Optimized quality assessment using DataLoader and batching.
@@ -376,13 +376,13 @@ class QualityFilter:
         valid_paths = []
 
         car_prompts = [
-            "a photograph of a car",
-            "a photo of a vehicle automobile",
-            "an image showing a car",
+            "car",
+            "vehicle",
+            "automobile",
         ]
-        non_car_prompts = ["a photo without any car", "an image with no vehicles"]
+        non_car_prompts = ["an image without any car", "an image with no vehicles"]
 
-        all_prompts = car_prompts + non_car_prompts
+        all_prompts = car_prompts #+ non_car_prompts
 
         # Process in batches
         for i in tqdm(
@@ -423,7 +423,7 @@ class QualityFilter:
 
                 # Check car confidence for each image
                 for idx, img_path in enumerate(paths):
-                    car_score = probs[idx, : len(car_prompts)].mean().item()
+                    car_score = probs[idx, : len(car_prompts)].max().item()
 
                     if car_score > self.car_confidence_threshold:
                         valid_paths.append(img_path)
@@ -431,5 +431,7 @@ class QualityFilter:
             except Exception as e:
                 logger.warning(f"Error processing batch: {e}")
                 continue
+        
+        logger.info(f"% of Valid Paths - {(len(valid_paths)/len(paths))*100}%")
 
         return valid_paths

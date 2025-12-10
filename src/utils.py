@@ -16,7 +16,7 @@ SUPPORTED_IMAGE_EXTENSIONS = frozenset(
 )
 
 
-def load_image_paths(image_dir: str) -> list[str]:
+def load_image_paths(image_dir: str, filter_list: str = None) -> list[str]:
     """Load all image paths from a directory recursively.
 
     Args:
@@ -33,12 +33,15 @@ def load_image_paths(image_dir: str) -> list[str]:
         raise FileNotFoundError(f"Image directory not found: {image_dir}")
 
     image_paths = []
-    for ext in SUPPORTED_IMAGE_EXTENSIONS:
-        image_paths.extend(image_dir_path.rglob(f"*{ext}"))
-        image_paths.extend(image_dir_path.rglob(f"*{ext.upper()}"))
+    if (filter_list is None):
+        for ext in SUPPORTED_IMAGE_EXTENSIONS:
+            image_paths.extend(image_dir_path.rglob(f"*{ext}"))
+            image_paths.extend(image_dir_path.rglob(f"*{ext.upper()}"))
+    else:
+        with open(filter_list, "r") as filter:
+            image_paths = [line.rstrip() for line in filter]
 
     return [str(p) for p in image_paths]
-
 
 def save_results(
     data: list[Any] | np.ndarray | dict[str, Any],
